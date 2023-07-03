@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import './App.css'
 import io from 'socket.io-client';
 
 const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 function App() {
+  const remoteDescriptionReady = useRef(false);
   const videoRef = useRef();
   const socketRef = useRef(
     io(
@@ -22,9 +23,8 @@ function App() {
       audio: false,
     });
     for (const track of gumStream.getTracks()) {
-      pc.addTrack(track);
+        pc.addTrack(track, gumStream);
     }
-    videoRef.current.srcObject = gumStream;
   }, [pc]);
 
   const onicecandidate = useCallback(() => {
@@ -42,10 +42,10 @@ function App() {
 
   const handleCall = async () => {
     try {
-      const offer = await pc.createOffer({ offerToReceiveAudio: false });
-      pc.setLocalDescription(offer);
-      const sdp = offer;
-      const rtcMessage = sdp;
+      await openCall();
+      const offer = await pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: true });
+      await pc.setLocalDescription(new RTCSessionDescription(offer));
+      const rtcMessage = pc.localDescription;
       const data = {
         deviceId: 'webrtc2',
         rtcMessage: rtcMessage,
@@ -62,16 +62,18 @@ function App() {
 
   const onNewCall = useCallback(async (data) => {
     try {
+      await openCall();
       const offer = data.rtcMessage;
-      await pc.setRemoteDescription(offer);
+      console.log("offer", offer.sdp);
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      remoteDescriptionReady.current = true;
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+      const rtcMessage = pc.localDescription;
       onicecandidate();
-      await openCall();
-      const sdp = answer;
       const response = {
         userId: data.userId,
-        rtcMessage: sdp,
+        rtcMessage,
       };
       socket.emit('answerCall', response);
     } catch (error) {
@@ -81,19 +83,22 @@ function App() {
 
   const onCallAnswered = useCallback(async (data) => {
     try {
+      console.log("callanswered")
       const answer = data.rtcMessage;
-      await pc.setRemoteDescription(answer);
-      await openCall();
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      remoteDescriptionReady.current = true;
       onicecandidate();
     } catch (error) {
       console.log("Error en la función onCallAnswered:", error);
     }
-  }, [pc, openCall, onicecandidate]);
+  }, [pc, onicecandidate]);
 
   const onICEcandidate = useCallback(async (data) => {
+    if (!remoteDescriptionReady.current) return;
     try {
-      const candidate = data.rtcMessage;
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      const iceCandidate = data.rtcMessage;
+      if(!iceCandidate?.candidate) return;
+      await pc.addIceCandidate(new RTCIceCandidate(iceCandidate));
     } catch (error) {
       console.log("Error en la función onICEcandidate:", error);
     }
@@ -103,6 +108,7 @@ function App() {
     pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         const stream = event.streams[0];
+        console.log("stream", stream);
         if (videoRef.current && videoRef.current.srcObject !== stream) {
           videoRef.current.srcObject = stream;
         }
@@ -117,6 +123,12 @@ function App() {
     onTrack();
     pc.onsignalingstatechange = () => {
       console.log("signalingState:", pc.signalingState);
+    };
+    pc.onicecandidateerror = () => {
+      console.log("onicecandidateerror:", pc.iceConnectionState);
+    };
+    pc.oniceconnectionstatechange = () => {
+      console.log("oniceconnectionstatechange:", pc.iceGatheringState);
     };
     return () => {
       socket.off('newCall', onNewCall);

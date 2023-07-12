@@ -9,7 +9,7 @@ function App() {
   const videoRef = useRef();
   const socketRef = useRef(
     io(
-      '192.168.100.11:3000',
+      '192.168.100.8:3000',
       { auth: { userId: "webrtc1"}},
     ),
   );
@@ -42,7 +42,7 @@ function App() {
 
   const handleCall = async () => {
     try {
-      await openCall();
+      // await openCall();
       const offer = await pc.createOffer({ offerToReceiveAudio: false, offerToReceiveVideo: true });
       await pc.setLocalDescription(new RTCSessionDescription(offer));
       const rtcMessage = pc.localDescription;
@@ -148,7 +148,7 @@ function App() {
     <>
       <button onClick={handleCall}>Call</button>
       <button onClick={handleAnswer}>Answer</button>
-      <video width={460} height={400} playsInline ref={videoRef} autoPlay></video>
+      <video playsInline ref={videoRef} autoPlay></video>
     </>
   )
 }

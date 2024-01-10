@@ -10,7 +10,7 @@ function App() {
   const socketRef = useRef(
     io(
       'https://eoti-server.onrender.com',
-      { auth: { userId: "webrtc1"}},
+      { auth: { userId: "114393167313865482034"}},
     ),
   );
   const pcRef = useRef(new RTCPeerConnection(configuration))
@@ -32,7 +32,7 @@ function App() {
       if (event.candidate) {
         // Enviar el candidato ICE al dispositivo receptor (puedes usar tu propia lógica de envío)
         const response = {
-          userId: '00:1A:2B:3C:4D:5E',
+          userId: 'ca:2a:a9:a6:9a:69',
           rtcMessage: event.candidate,
         }
         socket.emit('ICEcandidate', response);
@@ -47,7 +47,7 @@ function App() {
       await pc.setLocalDescription(new RTCSessionDescription(offer));
       const rtcMessage = pc.localDescription;
       const data = {
-        deviceId: '00:1A:2B:3C:4D:5E',
+        deviceId: 'ca:2a:a9:a6:9a:69',
         rtcMessage: rtcMessage,
       };
       socket.emit('call', data);
